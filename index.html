@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<title>TSL Jättöpaikkalaskuri</title>
+<style>
+    body { font-family: monospace, Arial; margin: 40px; }
+    #drop-zone {
+        border: 2px dashed #ccc;
+        padding: 30px;
+        text-align: center;
+        color: #999;
+        margin-bottom: 10px;
+    }
+    #output {
+        margin-top: 20px;
+        white-space: pre;
+        background: #f9f9f9;
+        padding: 10px;
+        border: 1px solid #ddd;
+    }
+    button {
+        padding: 6px 12px;
+        margin-top: 10px;
+        cursor: pointer;
+    }
+</style>
+<!-- XLSX-kirjasto CDN:stä -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js" integrity="sha512-v0i8P6gpl9XAj65rXABM++iH6cTnvZMdCjz79dZ2jFHw0H8BkB2tH6x8zBeU4GM0UlsV1mc+1MThq3oFfbpbIA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+<body>
+
+<h1>TSL Jättöpaikkalaskuri</h1>
+<div id="drop-zone">Pudota .TSL tiedosto tähän</div>
+<button onclick="clearOutput()">Tyhjennä kenttä</button>
+<button onclick="downloadExcel()" id="excel-btn" disabled>Lataa Excel</button>
+<div id="output"></div>
+
+<script>
+let currentFileName = 'tulos';
+let excelData = [];
+
+document.getElementById('drop-zone').addEventListener('dragover', function(e) {
+    e.preventDefault();
+    this.style.borderColor = 'green';
+});
+document.getElementById('drop-zone').addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    this.style.borderColor = '#ccc';
+});
+document.getElementById('drop-zone').addEventListener('drop', function(e) {
+    e.preventDefault();
+    this.style.borderColor = '#ccc';
+    const file = e.dataTransfer.files[0];
+    if (!file.name.toLowerCase().endsWith('.tsl')) {
+        alert('Lataa vain .TSL tiedostoja!');
+        return;
+    }
+    currentFileName = file.name.replace(/\.tsl$/i, '');
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        processTSL(e.target.result);
+    };
+    reader.readAsText(file, 'ISO-8859-1');
+});
+
+function processTSL(text) {
+    const lines = text.split(/\r?\n/);
+    let resultMap = {};
+    let order = [];
+    let addressTypeMap = {};
+    excelData = [["Jättöpaikka", "Kpl", "Osoitteellinen"]];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith('%2414')) {
+            const place = line.substring(182, 212).trim();
+            let isOsoitteellinen = false;
+
+            if (i + 1 < lines.length && lines[i + 1].startsWith('%2405')) {
+                isOsoitteellinen = true;
+            }
+
+            if (i > 0 && lines[i - 1].startsWith('%2403')) {
+                const qtyStr = lines[i - 1].substring(23, 27).trim();
+                const qty = parseInt(qtyStr, 10) || 0;
+
+                if (!resultMap[place]) {
+                    resultMap[place] = 0;
+                    order.push(place);
+                    addressTypeMap[place] = isOsoitteellinen;
+                }
+                resultMap[place] += qty;
+
+                if (isOsoitteellinen) {
+                    addressTypeMap[place] = true;
+                }
+            }
+        }
+    }
+
+    let totalQty = 0;
+    let outputText = '';
+
+    order.forEach(place => {
+        const qty = resultMap[place];
+        totalQty += qty;
+        const osoit = addressTypeMap[place] ? 'OSOITTEELLINEN' : '';
+        outputText += place.padEnd(40, ' ') + `YHT. ${qty} KPL. ${osoit}\n`;
+        excelData.push([place, qty, osoit]);
+    });
+
+    outputText += `\nKAPPALEMÄÄRÄT YHTEENSÄ: ${totalQty} KPL.`;
+    document.getElementById('output').textContent = outputText;
+
+    // Vasta nyt sallitaan Excel-painike
+    document.getElementById('excel-btn').disabled = false;
+}
+
+function clearOutput() {
+    document.getElementById('output').textContent = '';
+    document.getElementById('excel-btn').disabled = true;
+    excelData = [];
+}
+
+function downloadExcel() {
+    if (typeof XLSX === 'undefined') {
+        alert('Virhe: XLSX-kirjastoa ei löytynyt. Tarkista internet-yhteys.');
+        return;
+    }
+    if (excelData.length === 0) {
+        alert('Ei ladattavaa dataa.');
+        return;
+    }
+
+    // Luodaan Excel-työkirja
+    const ws = XLSX.utils.aoa_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tulokset");
+
+    // Ladataan tiedosto
+    XLSX.writeFile(wb, `${currentFileName}.xlsx`);
+}
+</script>
+
+</body>
+</html>
