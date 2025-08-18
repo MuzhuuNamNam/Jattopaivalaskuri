@@ -75,7 +75,8 @@
   <p>Tiputa .TSL -tiedosto(t) laatikkoon tai valitse ne. Sivusto laskee jättöpaikoittain kappalemäärät ja näyttää lisäksi
     lukeman sarakkeessa <strong>"Piirien määrä jättöpaikalla"</strong> seuraavasti: jokainen %2414-rivi kasvattaa kulloinkin
     luetun jättöpaikan laskuria +1. Jos peräkkäisillä %2414-riveillä on sama jättöpaikka, arvo kasvaa edelleen. Kun
-    jättöpaikan nimi vaihtuu, uusi jättöpaikka alkaa omalla laskurillaan.</p>
+    jättöpaikan nimi vaihtuu, uusi jättöpaikka alkaa omalla laskurillaan. Jos jättöpaikka on osoitteellinen, kaikki
+    tällaiset yhdistetään yhdeksi nimellä <strong>POSTI</strong>, ja niputus-sarakkeet jätetään tyhjiksi.</p>
 
   <div class="row" style="margin: 12px 0 16px">
     <div id="drop-zone">
@@ -170,10 +171,10 @@
       fileCount.textContent = files.length + ' tiedosto' + (files.length === 1 ? '' : 'a');
 
       // Yhdistetty tulos useista tiedostoista
-      const resultMap = Object.create(null);       // { place: kpl-summa }
-      const addressType = Object.create(null);     // { place: true/false }
-      const piiritLines = Object.create(null);     // { place: count of %2414 occurrences }
-      const order = [];                             // säilytetään ensimmäisen esiintymän järjestys
+      const resultMap = Object.create(null);       // { key: kpl-summa } (key = Jättöpaikka tai 'POSTI')
+      const addressType = Object.create(null);     // { key: true/false }
+      const piiritLines = Object.create(null);     // { key: count of %2414 occurrences }
+      const order = [];                             // ensimmäisen esiintymän järjestys (sis. 'POSTI' jos tarvitaan)
 
       for (const file of files) {
         const text = await readFileAsText(file);
@@ -198,6 +199,7 @@
     //   -> jokainen tällainen rivi kasvattaa kyseisen jättöpaikan "Piirien määrä jättöpaikalla" -laskuria +1
     // - edeltävä %2403 -rivi sisältää kappalemäärän kohdissa [23,27)
     // - %2405 heti jättöpaikan jälkeen tarkoittaa osoitteellista.
+    // - LISÄYS: jos rivi on osoitteellinen, kaikki tällaiset rivit kootaan yhdeksi jättöpaikaksi nimeltä 'POSTI'.
     function parseTSL(text, ctx) {
       const { resultMap, addressType, piiritLines, order } = ctx;
       const lines = text.split(/\r?\n/);
@@ -206,29 +208,32 @@
         const line = lines[i];
 
         if (line.startsWith('%2414')) {
-          const place = line.substring(182, 212).trim();
+          const placeRaw = line.substring(182, 212);
+          const place = (placeRaw || '').trim();
           if (!place) continue;
 
-          if (!(place in resultMap)) {
-            resultMap[place] = 0;
-            addressType[place] = false;
-            piiritLines[place] = 0;
-            order.push(place);
+          // Onko osoitteellinen? Tarkistetaan seuraava rivi.
+          const isAddressed = (i + 1 < lines.length && lines[i + 1].startsWith('%2405'));
+          const key = isAddressed ? 'POSTI' : place;
+
+          // Alustukset avaimelle (Jättöpaikka tai POSTI)
+          if (!(key in resultMap)) {
+            resultMap[key] = 0;
+            addressType[key] = isAddressed;
+            piiritLines[key] = 0;
+            order.push(key);
           }
+          // Jos POSTI on jo olemassa mutta tällä rivilläkin on osoitteellinen, varmista flagi
+          if (isAddressed) addressType[key] = true;
 
-          // Jokainen %2414 kasvattaa laskuria tälle jättöpaikalle
-          piiritLines[place] += 1;
+          // Jokainen %2414 kasvattaa laskuria tälle avaimelle
+          piiritLines[key] += 1;
 
-          // Osoitteellinen, jos seuraava rivi on %2405
-          if (i + 1 < lines.length && lines[i + 1].startsWith('%2405')) {
-            addressType[place] = true;
-          }
-
-          // Kpl poimitaan edelliseltä %2403 -riviltä
+          // Kpl poimitaan edelliseltä %2403 -riviltä ja lisätään tälle avaimelle
           if (i > 0 && lines[i - 1].startsWith('%2403')) {
             const qtyStr = lines[i - 1].substring(23, 27).trim();
             const qty = parseInt(qtyStr, 10) || 0;
-            resultMap[place] += qty;
+            resultMap[key] += qty;
           }
         }
       }
@@ -249,30 +254,34 @@
       let totalB60 = 0;
       let totalB50 = 0;
 
-      for (const place of order) {
-        const kpl = resultMap[place] || 0;
-        const oso = addressType[place] ? 'OSOITTEELLINEN' : '';
-        const piirit = piiritLines[place] || 0;
+      for (const key of order) {
+        const kpl = resultMap[key] || 0;
+        const isAddressed = !!addressType[key];
+        const name = key; // jos POSTI, näytetään POSTI
+        const piirit = piiritLines[key] || 0;
 
-        const b100 = bundles(kpl, 100);
-        const b60  = bundles(kpl, 60);
-        const b50  = bundles(kpl, 50);
+        // Nippusarake jätetään tyhjäksi POSTI-rivillä
+        const b100 = isAddressed ? '' : bundles(kpl, 100).toLocaleString('fi-FI');
+        const b60  = isAddressed ? '' : bundles(kpl, 60).toLocaleString('fi-FI');
+        const b50  = isAddressed ? '' : bundles(kpl, 50).toLocaleString('fi-FI');
 
         totalKpl += kpl;
         totalPiirit += piirit;
-        totalB100 += b100;
-        totalB60  += b60;
-        totalB50  += b50;
+        if (!isAddressed) {
+          totalB100 += bundles(kpl, 100);
+          totalB60  += bundles(kpl, 60);
+          totalB50  += bundles(kpl, 50);
+        }
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${escapeHtml(place)}</td>
+          <td>${escapeHtml(name)}</td>
           <td class="right">${kpl.toLocaleString('fi-FI')}</td>
-          <td>${oso}</td>
+          <td>${isAddressed ? 'OSOITTEELLINEN' : ''}</td>
           <td class="right">${piirit.toLocaleString('fi-FI')}</td>
-          <td class="right">${b100.toLocaleString('fi-FI')}</td>
-          <td class="right">${b60.toLocaleString('fi-FI')}</td>
-          <td class="right">${b50.toLocaleString('fi-FI')}</td>
+          <td class="right">${b100}</td>
+          <td class="right">${b60}</td>
+          <td class="right">${b50}</td>
         `;
         tbody.appendChild(tr);
       }
@@ -285,7 +294,7 @@
 
       tblWrap.classList.remove('hidden');
 
-      status.textContent = 'Jättöpaikkoja: ' + order.length + ' • Yhteensä ' + totalKpl.toLocaleString('fi-FI') + ' kpl • %2414-rivejä: ' + totalPiirit.toLocaleString('fi-FI');
+      status.textContent = 'Rivejä (%2414): ' + totalPiirit.toLocaleString('fi-FI') + ' • Jättöpaikkoja: ' + order.length + ' • Yhteensä ' + totalKpl.toLocaleString('fi-FI') + ' kpl';
     }
 
     function escapeHtml(str) {
