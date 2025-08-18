@@ -100,7 +100,7 @@
       <thead>
         <tr>
           <th style="width:28%">JÄTTÖPAIKKA</th>
-          <th class="right" style="width:10%">KPL</th>
+          <th class="right" style="width:10%">KKPL</th>
           <th style="width:14%">Osoitteellinen</th>
           <th class="right" style="width:12%">Piirien määrä jättöpaikalla</th>
           <th class="right" style="width:9%">100 nipuilla</th>
@@ -111,13 +111,22 @@
       <tbody></tbody>
       <tfoot>
         <tr>
-          <td>Yhteensä</td>
+          <td>YHTEENSÄ</td>
           <td class="right" id="total-kpl">0</td>
           <td></td>
           <td class="right" id="total-piirit">0</td>
-          <td class="right" id="total-b100">0</td>
-          <td class="right" id="total-b60">0</td>
-          <td class="right" id="total-b50">0</td>
+          <td class="right"></td>
+          <td class="right"></td>
+          <td class="right"></td>
+        </tr>
+        <tr>
+          <td>VARHAISJAKELU YHTEENSÄ</td>
+          <td class="right" id="early-kpl">0</td>
+          <td></td>
+          <td class="right" id="early-piirit">0</td>
+          <td class="right" id="early-b100">0</td>
+          <td class="right" id="early-b60">0</td>
+          <td class="right" id="early-b50">0</td>
         </tr>
       </tfoot>
     </table>
@@ -132,11 +141,15 @@
 
     const tblWrap = document.getElementById('table-wrap');
     const tbody = document.querySelector('#results-table tbody');
+
+    // Footer-solut
     const totalKplEl = document.getElementById('total-kpl');
     const totalPiiritEl = document.getElementById('total-piirit');
-    const totalB100El = document.getElementById('total-b100');
-    const totalB60El = document.getElementById('total-b60');
-    const totalB50El = document.getElementById('total-b50');
+    const earlyKplEl = document.getElementById('early-kpl');
+    const earlyPiiritEl = document.getElementById('early-piirit');
+    const earlyB100El = document.getElementById('early-b100');
+    const earlyB60El = document.getElementById('early-b60');
+    const earlyB50El = document.getElementById('early-b50');
 
     // Drag & drop visuaaliset efektit
     ['dragenter','dragover'].forEach(evt => dropZone.addEventListener(evt, e => {
@@ -174,7 +187,7 @@
       const resultMap = Object.create(null);       // { key: kpl-summa } (key = Jättöpaikka tai 'POSTI')
       const addressType = Object.create(null);     // { key: true/false }
       const piiritLines = Object.create(null);     // { key: count of %2414 occurrences }
-      const order = [];                             // ensimmäisen esiintymän järjestys (sis. 'POSTI' jos tarvitaan)
+      const order = [];                            // ensimmäisen esiintymän järjestys (sis. 'POSTI' jos tarvitaan)
 
       for (const file of files) {
         const text = await readFileAsText(file);
@@ -250,9 +263,15 @@
 
       let totalKpl = 0;
       let totalPiirit = 0;
+
+      // Nämä summataan vain ei-POSTI -riveiltä
       let totalB100 = 0;
       let totalB60 = 0;
       let totalB50 = 0;
+
+      // POSTI-muuttujat, jotta voimme laskea Varhaisjakelu = kaikki muut paitsi POSTI
+      let postiKpl = 0;
+      let postiPiirit = 0;
 
       for (const key of order) {
         const kpl = resultMap[key] || 0;
@@ -260,14 +279,20 @@
         const name = key; // jos POSTI, näytetään POSTI
         const piirit = piiritLines[key] || 0;
 
+        const isPosti = name === 'POSTI';
+
         // Nippusarake jätetään tyhjäksi POSTI-rivillä
-        const b100 = isAddressed ? '' : bundles(kpl, 100).toLocaleString('fi-FI');
-        const b60  = isAddressed ? '' : bundles(kpl, 60).toLocaleString('fi-FI');
-        const b50  = isAddressed ? '' : bundles(kpl, 50).toLocaleString('fi-FI');
+        const b100 = isPosti ? '' : bundles(kpl, 100).toLocaleString('fi-FI');
+        const b60  = isPosti ? '' : bundles(kpl, 60).toLocaleString('fi-FI');
+        const b50  = isPosti ? '' : bundles(kpl, 50).toLocaleString('fi-FI');
 
         totalKpl += kpl;
         totalPiirit += piirit;
-        if (!isAddressed) {
+
+        if (isPosti) {
+          postiKpl += kpl;
+          postiPiirit += piirit;
+        } else {
           totalB100 += bundles(kpl, 100);
           totalB60  += bundles(kpl, 60);
           totalB50  += bundles(kpl, 50);
@@ -286,15 +311,23 @@
         tbody.appendChild(tr);
       }
 
+      // Yhteensä (Kpl + Piirit), ei nippusarakkeita
       totalKplEl.textContent = totalKpl.toLocaleString('fi-FI');
       totalPiiritEl.textContent = totalPiirit.toLocaleString('fi-FI');
-      totalB100El.textContent = totalB100.toLocaleString('fi-FI');
-      totalB60El.textContent = totalB60.toLocaleString('fi-FI');
-      totalB50El.textContent = totalB50.toLocaleString('fi-FI');
+
+      // Varhaisjakelu yhteensä = kaikki paitsi POSTI; sekä nippusummat ilman POSTI:a
+      const earlyKpl = totalKpl - postiKpl;
+      const earlyPiirit = totalPiirit - postiPiirit;
+
+      earlyKplEl.textContent = earlyKpl.toLocaleString('fi-FI');
+      earlyPiiritEl.textContent = earlyPiirit.toLocaleString('fi-FI');
+      earlyB100El.textContent = totalB100.toLocaleString('fi-FI');
+      earlyB60El.textContent  = totalB60.toLocaleString('fi-FI');
+      earlyB50El.textContent  = totalB50.toLocaleString('fi-FI');
 
       tblWrap.classList.remove('hidden');
 
-      status.textContent = 'Rivejä (%2414): ' + totalPiirit.toLocaleString('fi-FI') + ' • Jättöpaikkoja: ' + order.length + ' • Yhteensä ' + totalKpl.toLocaleString('fi-FI') + ' kpl';
+      status.textContent = 'Rivejä: ' + totalPiirit.toLocaleString('fi-FI') + ' • Jättöpaikkoja: ' + order.length + ' • Yhteensä ' + totalKpl.toLocaleString('fi-FI') + ' kpl';
     }
 
     function escapeHtml(str) {
