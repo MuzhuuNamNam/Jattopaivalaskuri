@@ -1,147 +1,296 @@
 <!DOCTYPE html>
 <html lang="fi">
 <head>
-<meta charset="UTF-8">
-<title>TSL Jättöpaikkalaskuri</title>
-<style>
-    body { font-family: monospace, Arial; margin: 40px; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TSL Jättöpaikkalaskuri</title>
+  <style>
+    :root {
+      --bg: #0b0d10;
+      --panel: #11151a;
+      --muted: #8a98a8;
+      --text: #e6edf3;
+      --accent: #4da3ff;
+      --border: #1e252e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 32px;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: var(--bg);
+      color: var(--text);
+    }
+    h1 { margin: 0 0 12px; font-size: 28px; }
+    p { color: var(--muted); margin-top: 6px; }
+
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+
     #drop-zone {
-        border: 2px dashed #ccc;
-        padding: 30px;
-        text-align: center;
-        color: #999;
-        margin-bottom: 10px;
+      flex: 1 1 320px;
+      border: 2px dashed var(--border);
+      background: var(--panel);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      transition: border-color .15s ease, background .15s ease;
     }
-    #output {
-        margin-top: 20px;
-        white-space: pre;
-        background: #f9f9f9;
-        padding: 10px;
-        border: 1px solid #ddd;
+    #drop-zone.dragover { border-color: var(--accent); background: #0f1420; }
+
+    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    button, .btn {
+      border: 1px solid var(--border);
+      background: #151b22;
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
     }
-    button {
-        padding: 6px 12px;
-        margin-top: 10px;
-        cursor: pointer;
+    button[disabled] { opacity: .5; cursor: not-allowed; }
+    .btn-accent { border-color: #2b5fb5; background: #0e1a2e; }
+    .chip { display:inline-block; padding:4px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; color:var(--muted) }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; background: var(--panel); border-radius: 14px; overflow: hidden; }
+    thead th {
+      text-align: left;
+      font-size: 14px;
+      letter-spacing: .02em;
+      color: var(--muted);
+      background: #0f1318;
+      position: sticky; top: 0; z-index: 1;
     }
-</style>
-<!-- XLSX-kirjasto CDN:stä -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.19.3/xlsx.full.min.js" integrity="sha512-v0i8P6gpl9XAj65rXABM++iH6cTnvZMdCjz79dZ2jFHw0H8BkB2tH6x8zBeU4GM0UlsV1mc+1MThq3oFfbpbIA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    tbody tr:hover { background: #0f1420; }
+    tfoot td { font-weight: 700; }
+    .right { text-align: right; }
+
+    .note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+    .hidden { display:none; }
+  </style>
 </head>
 <body>
+  <h1>TSL Jättöpaikkalaskuri</h1>
+  <p>Tiputa .TSL -tiedosto(t) laatikkoon tai valitse ne. Sivusto laskee jättöpaikoittain kappalemäärät ja näyttää lisäksi
+    lukeman sarakkeessa <strong>"Piirien määrä jättöpaikalla"</strong> seuraavasti: jokainen %2414-rivi kasvattaa kulloinkin
+    luetun jättöpaikan laskuria +1. Jos peräkkäisillä %2414-riveillä on sama jättöpaikka, arvo kasvaa edelleen. Kun
+    jättöpaikan nimi vaihtuu, uusi jättöpaikka alkaa omalla laskurillaan.</p>
 
-<h1>TSL Jättöpaikkalaskuri</h1>
-<div id="drop-zone">Pudota .TSL tiedosto tähän</div>
-<button onclick="clearOutput()">Tyhjennä kenttä</button>
-<button onclick="downloadExcel()" id="excel-btn" disabled>Lataa Excel</button>
-<div id="output"></div>
+  <div class="row" style="margin: 12px 0 16px">
+    <div id="drop-zone">
+      <div style="font-size:16px; font-weight:700;">Pudota .TSL -tiedostot tähän</div>
+      <div class="note" style="margin-top:6px">tai</div>
+      <div style="margin-top:8px"><label class="btn btn-accent" for="file-input">Valitse tiedostot</label></div>
+      <input id="file-input" class="hidden" type="file" accept=".tsl,.TSL" multiple />
+      <div class="note" style="margin-top:12px"><span class="chip" id="file-count">Ei valittuja tiedostoja</span></div>
+    </div>
 
-<script>
-let currentFileName = 'tulos';
-let excelData = [];
+    <div style="flex: 1 1 280px; min-width:280px">
+      <div class="controls">
+        <button id="btn-clear">Tyhjennä</button>
+      </div>
+      <div class="note" id="status" style="margin-top:10px"></div>
+    </div>
+  </div>
 
-document.getElementById('drop-zone').addEventListener('dragover', function(e) {
-    e.preventDefault();
-    this.style.borderColor = 'green';
-});
-document.getElementById('drop-zone').addEventListener('dragleave', function(e) {
-    e.preventDefault();
-    this.style.borderColor = '#ccc';
-});
-document.getElementById('drop-zone').addEventListener('drop', function(e) {
-    e.preventDefault();
-    this.style.borderColor = '#ccc';
-    const file = e.dataTransfer.files[0];
-    if (!file.name.toLowerCase().endsWith('.tsl')) {
-        alert('Lataa vain .TSL tiedostoja!');
-        return;
-    }
-    currentFileName = file.name.replace(/\.tsl$/i, '');
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        processTSL(e.target.result);
-    };
-    reader.readAsText(file, 'ISO-8859-1');
-});
+  <div id="table-wrap" class="hidden">
+    <table id="results-table" aria-label="Tulostaulukko">
+      <thead>
+        <tr>
+          <th style="width:28%">Jättöpaikka</th>
+          <th class="right" style="width:10%">Kpl</th>
+          <th style="width:14%">Osoitteellinen</th>
+          <th class="right" style="width:12%">"Piirien määrä jättöpaikalla"</th>
+          <th class="right" style="width:9%">100 nipuilla</th>
+          <th class="right" style="width:9%">60 nipuilla</th>
+          <th class="right" style="width:9%">50 kpl nipuilla</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+      <tfoot>
+        <tr>
+          <td>Yhteensä</td>
+          <td class="right" id="total-kpl">0</td>
+          <td></td>
+          <td class="right" id="total-piirit">0</td>
+          <td class="right" id="total-b100">0</td>
+          <td class="right" id="total-b60">0</td>
+          <td class="right" id="total-b50">0</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
 
-function processTSL(text) {
-    const lines = text.split(/\r?\n/);
-    let resultMap = {};
-    let order = [];
-    let addressTypeMap = {};
-    excelData = [["Jättöpaikka", "Kpl", "Osoitteellinen"]];
+  <script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const fileCount = document.getElementById('file-count');
+    const btnClear = document.getElementById('btn-clear');
+    const status = document.getElementById('status');
 
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line.startsWith('%2414')) {
-            const place = line.substring(182, 212).trim();
-            let isOsoitteellinen = false;
+    const tblWrap = document.getElementById('table-wrap');
+    const tbody = document.querySelector('#results-table tbody');
+    const totalKplEl = document.getElementById('total-kpl');
+    const totalPiiritEl = document.getElementById('total-piirit');
+    const totalB100El = document.getElementById('total-b100');
+    const totalB60El = document.getElementById('total-b60');
+    const totalB50El = document.getElementById('total-b50');
 
-            if (i + 1 < lines.length && lines[i + 1].startsWith('%2405')) {
-                isOsoitteellinen = true;
-            }
+    // Drag & drop visuaaliset efektit
+    ['dragenter','dragover'].forEach(evt => dropZone.addEventListener(evt, e => {
+      e.preventDefault(); e.stopPropagation();
+      dropZone.classList.add('dragover');
+    }));
+    ;['dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e => {
+      e.preventDefault(); e.stopPropagation();
+      dropZone.classList.remove('dragover');
+    }));
 
-            if (i > 0 && lines[i - 1].startsWith('%2403')) {
-                const qtyStr = lines[i - 1].substring(23, 27).trim();
-                const qty = parseInt(qtyStr, 10) || 0;
-
-                if (!resultMap[place]) {
-                    resultMap[place] = 0;
-                    order.push(place);
-                    addressTypeMap[place] = isOsoitteellinen;
-                }
-                resultMap[place] += qty;
-
-                if (isOsoitteellinen) {
-                    addressTypeMap[place] = true;
-                }
-            }
-        }
-    }
-
-    let totalQty = 0;
-    let outputText = '';
-
-    order.forEach(place => {
-        const qty = resultMap[place];
-        totalQty += qty;
-        const osoit = addressTypeMap[place] ? 'OSOITTEELLINEN' : '';
-        outputText += place.padEnd(40, ' ') + `YHT. ${qty} KPL. ${osoit}\n`;
-        excelData.push([place, qty, osoit]);
+    dropZone.addEventListener('drop', async (e) => {
+      const files = [...e.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith('.tsl'));
+      if (!files.length) { alert('Lataa vain .TSL -tiedostoja.'); return; }
+      await handleFiles(files);
     });
 
-    outputText += `\nKAPPALEMÄÄRÄT YHTEENSÄ: ${totalQty} KPL.`;
-    document.getElementById('output').textContent = outputText;
+    fileInput.addEventListener('change', async (e) => {
+      const files = [...e.target.files].filter(f => f.name.toLowerCase().endsWith('.tsl'));
+      if (!files.length) { alert('Valitse .TSL -tiedostoja.'); return; }
+      await handleFiles(files);
+    });
 
-    // Vasta nyt sallitaan Excel-painike
-    document.getElementById('excel-btn').disabled = false;
-}
+    btnClear.addEventListener('click', () => {
+      tbody.innerHTML = '';
+      tblWrap.classList.add('hidden');
+      fileCount.textContent = 'Ei valittuja tiedostoja';
+      status.textContent = '';
+    });
 
-function clearOutput() {
-    document.getElementById('output').textContent = '';
-    document.getElementById('excel-btn').disabled = true;
-    excelData = [];
-}
+    async function handleFiles(files) {
+      fileCount.textContent = files.length + ' tiedosto' + (files.length === 1 ? '' : 'a');
 
-function downloadExcel() {
-    if (typeof XLSX === 'undefined') {
-        alert('Virhe: XLSX-kirjastoa ei löytynyt. Tarkista internet-yhteys.');
-        return;
+      // Yhdistetty tulos useista tiedostoista
+      const resultMap = Object.create(null);       // { place: kpl-summa }
+      const addressType = Object.create(null);     // { place: true/false }
+      const piiritLines = Object.create(null);     // { place: count of %2414 occurrences }
+      const order = [];                             // säilytetään ensimmäisen esiintymän järjestys
+
+      for (const file of files) {
+        const text = await readFileAsText(file);
+        parseTSL(text, { resultMap, addressType, piiritLines, order });
+      }
+
+      renderResults({ resultMap, addressType, piiritLines, order });
     }
-    if (excelData.length === 0) {
-        alert('Ei ladattavaa dataa.');
-        return;
+
+    function readFileAsText(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        // Monet TSL:t ovat Latin-1 (ISO-8859-1); käytetään sitä oletuksena
+        reader.readAsText(file, 'ISO-8859-1');
+        reader.onerror = reject;
+      });
     }
 
-    // Luodaan Excel-työkirja
-    const ws = XLSX.utils.aoa_to_sheet(excelData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Tulokset");
+    // Parseri:
+    // - %2414 -rivi sisältää jättöpaikan nimen kohdissa [182,212)
+    //   -> jokainen tällainen rivi kasvattaa kyseisen jättöpaikan "Piirien määrä jättöpaikalla" -laskuria +1
+    // - edeltävä %2403 -rivi sisältää kappalemäärän kohdissa [23,27)
+    // - %2405 heti jättöpaikan jälkeen tarkoittaa osoitteellista.
+    function parseTSL(text, ctx) {
+      const { resultMap, addressType, piiritLines, order } = ctx;
+      const lines = text.split(/\r?\n/);
 
-    // Ladataan tiedosto
-    XLSX.writeFile(wb, `${currentFileName}.xlsx`);
-}
-</script>
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
 
+        if (line.startsWith('%2414')) {
+          const place = line.substring(182, 212).trim();
+          if (!place) continue;
+
+          if (!(place in resultMap)) {
+            resultMap[place] = 0;
+            addressType[place] = false;
+            piiritLines[place] = 0;
+            order.push(place);
+          }
+
+          // Jokainen %2414 kasvattaa laskuria tälle jättöpaikalle
+          piiritLines[place] += 1;
+
+          // Osoitteellinen, jos seuraava rivi on %2405
+          if (i + 1 < lines.length && lines[i + 1].startsWith('%2405')) {
+            addressType[place] = true;
+          }
+
+          // Kpl poimitaan edelliseltä %2403 -riviltä
+          if (i > 0 && lines[i - 1].startsWith('%2403')) {
+            const qtyStr = lines[i - 1].substring(23, 27).trim();
+            const qty = parseInt(qtyStr, 10) || 0;
+            resultMap[place] += qty;
+          }
+        }
+      }
+    }
+
+    function bundles(total, size) {
+      if (!Number.isFinite(total) || total <= 0) return 0;
+      return Math.ceil(total / size);
+    }
+
+    function renderResults({ resultMap, addressType, piiritLines, order }) {
+      // Tyhjennä vanha
+      tbody.innerHTML = '';
+
+      let totalKpl = 0;
+      let totalPiirit = 0;
+      let totalB100 = 0;
+      let totalB60 = 0;
+      let totalB50 = 0;
+
+      for (const place of order) {
+        const kpl = resultMap[place] || 0;
+        const oso = addressType[place] ? 'OSOITTEELLINEN' : '';
+        const piirit = piiritLines[place] || 0;
+
+        const b100 = bundles(kpl, 100);
+        const b60  = bundles(kpl, 60);
+        const b50  = bundles(kpl, 50);
+
+        totalKpl += kpl;
+        totalPiirit += piirit;
+        totalB100 += b100;
+        totalB60  += b60;
+        totalB50  += b50;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(place)}</td>
+          <td class="right">${kpl.toLocaleString('fi-FI')}</td>
+          <td>${oso}</td>
+          <td class="right">${piirit.toLocaleString('fi-FI')}</td>
+          <td class="right">${b100.toLocaleString('fi-FI')}</td>
+          <td class="right">${b60.toLocaleString('fi-FI')}</td>
+          <td class="right">${b50.toLocaleString('fi-FI')}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      totalKplEl.textContent = totalKpl.toLocaleString('fi-FI');
+      totalPiiritEl.textContent = totalPiirit.toLocaleString('fi-FI');
+      totalB100El.textContent = totalB100.toLocaleString('fi-FI');
+      totalB60El.textContent = totalB60.toLocaleString('fi-FI');
+      totalB50El.textContent = totalB50.toLocaleString('fi-FI');
+
+      tblWrap.classList.remove('hidden');
+
+      status.textContent = 'Jättöpaikkoja: ' + order.length + ' • Yhteensä ' + totalKpl.toLocaleString('fi-FI') + ' kpl • %2414-rivejä: ' + totalPiirit.toLocaleString('fi-FI');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
+    }
+  </script>
 </body>
 </html>
