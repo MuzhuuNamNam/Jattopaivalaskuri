@@ -77,11 +77,15 @@
 <body>
   <h1>TSL Jättöpaikkalaskuri</h1>
   <nav class="site-nav" aria-label="Sivuston navigaatio">
-    <a class="nav-link active" href="index.html">Lahti</a>
+    <a class="nav-link" href="index.html">Lahti</a>
     <a class="nav-link" href="kouvola.html">Kouvola</a>
-    <a class="nav-link" href="varkaus.html">Varkaus</a>
+    <a class="nav-link active" href="varkaus.html">Varkaus</a>
   </nav>
-  <p>Toimii seuraavilla lehdillä: Keski-Uusimaa, Uusimaa, Aamuposti, Länsi-Uusimaa, Sipoon sanomat, Lopen lehti</p>
+  <p>Tiputa .TSL -tiedosto(t) laatikkoon tai valitse ne. Sivusto laskee jättöpaikoittain kappalemäärät ja näyttää lisäksi
+    lukeman sarakkeessa <strong>"Piirien määrä jättöpaikalla"</strong> seuraavasti: jokainen %2414-rivi kasvattaa kulloinkin
+    luetun jättöpaikan laskuria +1. Jos peräkkäisillä %2414-riveillä on sama jättöpaikka, arvo kasvaa edelleen. Kun
+    jättöpaikan nimi vaihtuu, uusi jättöpaikka alkaa omalla laskurillaan. Jos jättöpaikka on osoitteellinen, kaikki
+    tällaiset yhdistetään yhdeksi nimellä <strong>POSTI</strong>, ja niputus-sarakkeet jätetään tyhjiksi.</p>
 
   <div class="row" style="margin: 12px 0 16px">
     <div id="drop-zone">
