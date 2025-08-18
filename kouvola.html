@@ -81,7 +81,8 @@
     <a class="nav-link active" href="kouvola.html">Kouvola</a>
     <a class="nav-link" href="varkaus.html">Varkaus</a>
   </nav>
-  <p>Toimii seuraavilla lehdillä: Testissä vielä. Lukee eri kohdan .TSL tiedostosta jättöpaikkatiedon saadakseen.</p>
+  <p>Toimii seuraavilla lehdillä: Testissä vielä. Lukee eri kohdan .TSL tiedostosta jättöpaikkatiedon saadakseen. 
+    Lukee oikein myös Lahden työt, lukee vain eri kohdasta jättöpaikan ja jättää jättöpaikan nimen pois.</p>
 
   <div class="row" style="margin: 12px 0 16px">
     <div id="drop-zone">
@@ -226,7 +227,7 @@
     // Parseri:
     // - %2414 -rivi sisältää jättöpaikan nimen kohdissa [165,182)
     //   -> jokainen tällainen rivi kasvattaa kyseisen jättöpaikan "Piirien määrä jättöpaikalla" -laskuria +1
-    // - edeltävä %2403 -rivi sisältää kappalemäärän kohdissa [23,27)
+    // - edeltävä %2403 -rivi sisältää kappalemäärän kohdissa [22,26)
     // - %2405 heti jättöpaikan jälkeen tarkoittaa osoitteellista.
     // - LISÄYS: jos rivi on osoitteellinen, kaikki tällaiset rivit kootaan yhdeksi jättöpaikaksi nimeltä 'POSTI'.
     function parseTSL(text, ctx) {
@@ -260,7 +261,7 @@
 
           // Kpl poimitaan edelliseltä %2403 -riviltä ja lisätään tälle avaimelle
           if (i > 0 && lines[i - 1].startsWith('%2403')) {
-            const qtyStr = lines[i - 1].substring(23, 27).trim();
+            const qtyStr = lines[i - 1].substring(22, 26).trim();
             const qty = parseInt(qtyStr, 10) || 0;
             resultMap[key] += qty;
           }
