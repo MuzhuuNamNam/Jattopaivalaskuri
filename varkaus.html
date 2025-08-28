@@ -6,12 +6,12 @@
   <title>TSL Jättöpaikkalaskuri</title>
   <style>
     :root {
-      --bg: #0b0d10;
-      --panel: #11151a;
-      --muted: #8a98a8;
-      --text: #e6edf3;
-      --accent: #4da3ff;
-      --border: #1e252e;
+      --bg: #ffffff;
+      --panel: #ffffff;
+      --muted: #000000;
+      --text: #000000;
+      --accent: #60b5dd;
+      --border: #b2b4b5;
     }
     * { box-sizing: border-box; }
     body {
@@ -35,13 +35,13 @@
       color: var(--muted);
       transition: border-color .15s ease, background .15s ease;
     }
-    #drop-zone.dragover { border-color: var(--accent); background: #0f1420; }
+    #drop-zone.dragover { border-color: var(--accent); background: #b2b4b5; }
 
     .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
     button, .btn {
       border: 1px solid var(--border);
-      background: #151b22;
+      background: #a9a9aa;
       color: var(--text);
       padding: 10px 14px;
       border-radius: 12px;
@@ -49,7 +49,7 @@
       font-weight: 600;
     }
     button[disabled] { opacity: .5; cursor: not-allowed; }
-    .btn-accent { border-color: #2b5fb5; background: #0e1a2e; }
+    .btn-accent { border-color: #2b5fb5; background: #b2b4b5; }
     .chip { display:inline-block; padding:4px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; color:var(--muted) }
 
     table { width: 100%; border-collapse: collapse; margin-top: 16px; background: var(--panel); border-radius: 14px; overflow: hidden; }
@@ -58,11 +58,11 @@
       font-size: 14px;
       letter-spacing: .02em;
       color: var(--muted);
-      background: #0f1318;
+      background: #b2b4b5;
       position: sticky; top: 0; z-index: 1;
     }
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-    tbody tr:hover { background: #0f1420; }
+    tbody tr:hover { background: #cacdd1; }
     tfoot td { font-weight: 700; }
     .right { text-align: right; }
 
@@ -70,8 +70,8 @@
     .hidden { display:none; }
       /* Navigaatio */
     nav.site-nav { margin: 8px 0 18px; display: inline-flex; gap: 8px; flex-wrap: wrap; }
-    .site-nav a { display:inline-block; padding:8px 12px; border:3px solid var(--border); border-radius:999px; text-decoration:none; color: var(--text); background:#151b22; font-weight:600; font-size:14px; }
-    .site-nav a.active { border-color:#3475dd; background:#0e1a2e; }
+    .site-nav a { display:inline-block; padding:8px 12px; border:3px solid var(--border); border-radius:999px; text-decoration:none; color: var(--text); background:#b2b4b5; font-weight:600; font-size:14px; }
+    .site-nav a.active { border-color:#3475dd; background:#b2b4b5; }
   </style>
 </head>
 <body>
@@ -81,7 +81,7 @@
     <a class="nav-link" href="kouvola.html">Kouvola</a>
     <a class="nav-link active" href="varkaus.html">Varkaus</a>
   </nav>
-  <p>Toimii seuraavilla lehdillä: Tämä täysin varalla. Tarkistetaan onko tarvetta, vai toimiiko täysin samoin kuin Kouvolan sivu.</p>
+  <p>Toimii seuraavilla lehdillä: VÄLIAIKAISESTI TEHTY SANOMAN FOLE JA HAMS ASETUKSILLE. JAKAA SILTI JÄTTÖPAIKKOJA TURHAN MONEEN. RULLAKOINTI MENEE REITIN MUKAAN.</p>
 
   <div class="row" style="margin: 12px 0 16px">
     <div id="drop-zone">
@@ -224,7 +224,7 @@
     }
 
     // Parseri:
-    // - %2414 -rivi sisältää jättöpaikan nimen kohdissa [182,212)
+    // - %2414 -rivi sisältää jättöpaikan nimen kohdissa [142,217)
     //   -> jokainen tällainen rivi kasvattaa kyseisen jättöpaikan "Piirien määrä jättöpaikalla" -laskuria +1
     // - edeltävä %2403 -rivi sisältää kappalemäärän kohdissa [22,26)
     // - %2405 heti jättöpaikan jälkeen tarkoittaa osoitteellista.
@@ -237,7 +237,7 @@
         const line = lines[i];
 
         if (line.startsWith('%2414')) {
-          const placeRaw = line.substring(182, 212);
+          const placeRaw = line.substring(142, 217);
           const place = (placeRaw || '').trim();
           if (!place) continue;
 
